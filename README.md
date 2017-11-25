@@ -7,7 +7,6 @@ The application uses MonoDB for storing Users and presents a REST-API for access
 ### MongoDB
 The application requires a running MongoDB.  
 Docker to the rescue:
-  
     docker run --name some-mongo -d mongo
 
 ### Application
