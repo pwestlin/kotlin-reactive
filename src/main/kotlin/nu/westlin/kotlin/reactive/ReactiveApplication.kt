@@ -10,6 +10,8 @@ import org.springframework.data.annotation.Id
 import org.springframework.data.domain.Sort
 import org.springframework.data.mongodb.core.mapping.Document
 import org.springframework.data.mongodb.repository.ReactiveMongoRepository
+import org.springframework.web.reactive.function.server.*
+import reactor.core.publisher.Mono
 import reactor.core.publisher.toFlux
 
 @SpringBootApplication
@@ -38,18 +40,54 @@ fun main(args: Array<String>) {
                                     .deleteAll()
                                     .thenMany(users)
                                     .thenMany(userRepository.findAll())
-                                    .subscribe { logger.info("Created user = $it") }
+                                    .subscribe()
+                            //.subscribe { logger.info("Created user = $it") }
+                        }
+
+                        bean<UserHandler>()
+
+                        bean {
+                            router {
+                                val userHandler = ref<UserHandler>()
+
+                                GET("/users", userHandler::findAll)
+                                GET("/users/{id}", userHandler::findById)
+                                POST("/users", userHandler::add)
+                            }
                         }
                     }
             )
             .run(*args)
 
+    logger.info("Users in database")
     ctx.getBean(UserRepository::class.java)
             .findAll(Sort(Sort.Order.asc("name")))
-            .subscribe { logger.info("User in database = $it") }
+            .subscribe { logger.info(it) }
+}
+
+class UserHandler(val userRepository: UserRepository) {
+    fun findAll(request: ServerRequest): Mono<ServerResponse> = ServerResponse.ok().body(userRepository.findAll())
+
+    fun findById(request: ServerRequest): Mono<ServerResponse> =
+            ServerResponse.ok().body(userRepository.findById(request.pathVariable("id")))
+
+    fun add(request: ServerRequest): Mono<ServerResponse> {
+        // TODO: Do this in a reactive way (not block)
+        val user = userRepository.insert(request.bodyToMono<User>().block())
+
+        return ServerResponse.ok().body(user)
+    }
+
+    // TODO: Add a put that updates an exisiting user (with userRepository.save)
+
+}
+
+fun add(serverRequest: ServerRequest) {
+
 }
 
 
 interface UserRepository : ReactiveMongoRepository<User, String>
+
 
 @Document data class User(@Id var id: String? = null, var name: String? = null)
